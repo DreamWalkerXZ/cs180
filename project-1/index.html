@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Yueheng Zeng's CS180 Repository</title>
+</head>
+
+<body class="container mx-auto p-4">
+    <h1 class="text-3xl font-bold text-center">Images of the Russian Empire:</h1>
+    <h1 class="text-3xl font-bold text-center text-rose-500">Colorizing the Prokudin-Gorskii photo collection</h1>
+    <p class="text-2xl text-center p-4">
+        Yueheng Zeng
+        <span class="font-bold text-rose-500">@</span>
+        Project 1
+    </p>
+    <h2 class="text-3xl font-bold p-4">Overview</h2>
+    <p class="text-xl p-4">
+        The goal of this project is to colorize the Prokudin-Gorskii photo collection. The collection is a series of
+        photographs taken by Russian photographer Sergei Mikhailovich Prokudin-Gorskii in the early 20th century. The
+        photographs are in black and white, but they were taken using a special camera that captured three separate
+        black and white images, each with a different color filter (red, green, or blue). By combining these three
+        images, we can reconstruct the original color image.
+    </p>
+
+    <div class="flex justify-center p-4">
+        <img src="img/lady.jpg" class="h-96">
+        <img src="output/better_color_mapped_large/lady.jpg" class="pl-8 h-96">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image on the left is the original black and white image, and the image on the right is the colorized image
+        produced by this project.
+    </p>
+
+    <h2 class="text-3xl font-bold p-4">Table of Contents</h2>
+    <ol class="text-xl pl-9 list-decimal p-4 text-blue-500">
+        <li>
+            <a class="underline" href="#aligning-the-low-resolution-images">Aligning the low-resolution
+                images</a>
+        </li>
+        <li>
+            <a class="underline" href="#aligning-the-high-resolution-images">Aligning the
+                high-resolution images</a>
+        </li>
+        <li>
+            <a class="underline" href="#automatic-cropping">Automatic Cropping</a>
+        </li>
+        <li>
+            <a class="underline" href="#automatic-contrasting">Automatic Contrasting</a>
+        </li>
+        <li>
+            <a class="underline" href="#better-color-mapping">Better Color Mapping</a>
+        </li>
+        <li>
+            <a class="underline" href="#all-results">All results</a>
+        </li>
+    </ol>
+
+    <h2 class="text-3xl font-bold p-4" id="aligning-the-low-resolution-images">Aligning the low-resolution images</h2>
+    <p class="text-xl p-4">
+        The alignment process for low-resolution images involves loading the images, splitting them into separate
+        channels, detecting edges, and aligning the channels to create colorized images. The process is as follows:
+    </p>
+    <ol class="text-xl pl-9 list-decimal p-4">
+        <li>
+            <strong>Loading and Splitting Channels:</strong>
+            Load the image and split it into three separate channels—blue (B), green (G), and red (R)—from a single
+            image where
+            these channels are stacked vertically. This is achieved by dividing the height of the image by three and
+            slicing it into
+            equal parts for each channel.
+        </li>
+        <li>
+            <strong>Edge Detection:</strong>
+            Use the Canny edge detector to detect edges in the images. This technique
+            helps focus on key features of the image (e.g., edges and transitions) rather than pixel intensity
+            values, which can be less effective for alignment due to variations in brightness.
+        </li>
+        <li>
+            <strong>Alignment Process:</strong>
+            <ol class="pl-9 list-disc">
+                <li>
+                    The alignment of the green (G) and red (R) channels to the blue (B) channel is performed using a
+                    brute-force
+                    search over a specified range of pixel displacements
+                    (I used a range of -15 to 15 pixels) along both the horizontal and vertical axes.
+                </li>
+                <li>
+                    A cropping step is included in the alignment to avoid border artifacts. I cut off 10% of the image
+                    from the edges
+                    before calculating the distance.
+                </li>
+                <li>
+                    For each possible combination of vertical and horizontal displacements, the
+                    function shifts the green or red channel using np.roll and calculates the squared Euclidean distance
+                    between the shifted
+                    channel and the reference channel (the blue channel).
+                </li>
+            </ol>
+        </li>
+    </ol>
+
+    <div class="flex justify-center p-4">
+        <img src="img/cathedral.jpg" class="h-96">
+        <img src="output/small/cathedral.jpg" class="pl-8 h-96">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above is the cathedral image before and after alignment.
+    </p>
+
+    <h2 class="text-3xl font-bold p-4" id="aligning-the-high-resolution-images">Aligning the high-resolution images</h2>
+    <p class="text-xl p-4">
+        The alignment process for high-resolution images is similar to the process for low-resolution images, but it
+        will take significantly longer to run due to the increased image size. To speed up the process, it is common to
+        use a pyramid approach, where the image is progressively downsampled to create a series of smaller images that
+        are easier to align. The process is as follows:
+    </p>
+    <ol class="text-xl pl-9 list-decimal p-4">
+        <li>
+            <strong>Create Pyramid:</strong>
+            Generate progressively smaller versions of the image at each level by downscaling the original channel.
+            I down scaled the image by a factor of 2 for each level and I want the smallest image have a height around
+            400 pixels.
+        </li>
+        <li>
+            <strong>Recursive Alignment:</strong>
+            <ol class="pl-9 list-disc">
+                <li>
+                    Start aligning at the lowest resolution (coarsest level).
+                </li>
+                <li>
+                    Recursively align each higher level by first aligning the next coarser level.
+                </li>
+                <li>
+                    Scale up the offset from the lower level and apply it to the current level before refining the
+                    alignment.
+                </li>
+            </ol>
+        </li>
+        <li>
+            <strong>Refine Alignment:</strong>
+            At each level, combine the new alignment offset with the scaled offset from the previous level to
+            progressively improve
+            accuracy as the resolution increases.
+        </li>
+    </ol>
+
+    <div class="flex justify-center p-4">
+        <img src="img/lady.jpg" class="h-96">
+        <img src="output/large/lady.jpg" class="pl-8 h-96">
+    </div>
+
+    <p class="text-xl p-4 text-gray-500">
+        The image above is the lady image before and after alignment.
+    </p>
+
+    <h2 class="text-3xl font-bold p-4" id="automatic-cropping">Automatic Cropping</h2>
+
+    <p class="text-xl p-4">
+        The automatic cropping process is used to remove the weird border artifacts that appear in the aligned images.
+        The process is as follows:
+    </p>
+
+    <ol class="text-xl pl-9 list-decimal p-4">
+        <li>
+            <strong>Rescale Image:</strong>
+            If the image height is larger than 500 pixels, it is downscaled; otherwise, it remains at the same
+            resolution.
+        </li>
+        <li>
+            <strong>Crop Central Region:</strong>
+            A central 60% region of the image is extracted both horizontally and vertically for line detection.
+        </li>
+        <li>
+            <strong>Line Detection:</strong>
+            Vertical (left, right) and horizontal (top, bottom) lines are detected in each color channel using Canny
+            edge detection
+            and Hough transforms.
+        </li>
+        <li>
+            <strong>Determine Innermost Lines:</strong>
+            The coordinates of the innermost lines (left, right, top, bottom) are determined.
+        </li>
+        <li>
+            <strong>Adjust Crop:</strong>
+            A small margin (1% of the image) is removed from each side to avoid edge artifacts.
+        </li>
+        <li>
+            <strong>Crop Image:</strong>
+            The image is cropped using the coordinates of the innermost lines.
+        </li>
+    </ol>
+
+    <div class="flex justify-center p-4">
+        <img src="output/large/lady.jpg" class="h-96">
+        <img src="output/cropped_large/lady.jpg" class="pl-8 h-96">
+    </div>
+
+    <p class="text-xl p-4 text-gray-500">
+        The image above is the lady image before and after cropping.
+    </p>
+
+    <h2 class="text-3xl font-bold p-4" id="automatic-contrasting">Automatic Contrasting</h2>
+
+    <p class="text-xl p-4">
+        The automatic contrasting process is used to enhance the contrast of the images. The process is as follows:
+    </p>
+
+    <ol class="text-xl pl-9 list-decimal p-4">
+        <li>
+            <strong>Crop the Image:</strong>
+            The image is cropped to avoid border artifacts.
+        </li>
+        <li>
+            <strong>Determine Min and Max Values:</strong>
+            The minimum and maximum pixel values within the cropped region are calculated. These values represent the
+            darkest and
+            brightest parts of the image within the selected region.
+        </li>
+        <li>
+            <strong>Scale Pixel Values:</strong>
+            The pixel values in the entire image are linearly scaled so that the minimum value becomes 0 and the maximum
+            value
+            becomes 1. This improves contrast by stretching the image's intensity values across the full range. For
+            those pixels
+            that are outside the range, they are clipped to the minimum or maximum value.
+        </li>
+    </ol>
+
+    <div class="flex justify-center p-4">
+        <img src="output/cropped_large/lady.jpg" class="h-96">
+        <img src="output/auto_contrasted_large/lady.jpg" class="pl-8 h-96">
+    </div>
+
+    <p class="text-xl p-4 text-gray-500">
+        The upper-left image is the lady image before automatic contrasting, and the upper-right image is the lady image
+        after automatic contrasting.
+    </p>
+
+    <h2 class="text-3xl font-bold p-4" id="better-color-mapping">Better Color Mapping</h2>
+    <p class="text-xl p-4">
+        The better color mapping process is used to map the images to a more realistic color space. The process is as
+        follows:
+    </p>
+
+    <ol class="text-xl pl-9 list-decimal p-4">
+        <li>
+            <strong>Convert to LAB Color Space:</strong>
+            Convert the image from the RGB color space to the LAB color space. The LAB color space is designed to mimic
+            human vision
+            and is more perceptually uniform than the RGB color space.
+        </li>
+        <li>
+            <strong>Adjust the AB Channels:</strong>
+            I wrote a program that creates a simple GUI using tkinter that allows
+            real-time adjustment of the L (lightness), A (green-red), and B (blue-yellow)
+            channels in the LAB color space of an image.
+            Then I performed some experiments to find the best scaling factors for the A and B channels to achieve a
+            more realistic color mapping.
+            <div class="flex justify-center p-4">
+                <img src="img/lab_lady.png" class="h-96">
+                <div class="pl-8 h-96">
+                    <strong>Some results:</strong>
+                    <ul class="pl-5 pb-4 list-disc">
+                        <li>emir: L: 1, A: 0.4, B: 0.95</li>
+                        <li>church: L: 1, A: 0.31, B: 0.91</li>
+                        <li>lady: L: 1, A: 0.36, B: 0.87</li>
+                        <li>three_generations: L: 1, A: 0.36, B: 0.95</li>
+                        <li>tobolsk: L: 1, A: 0.31, B: 0.95</li>
+                    </ul>
+                    <strong>Conclusion:</strong><br>
+                    According to the experiments, it is reasonable to leave the L channel unchanged and scale the
+                    A and B channels by 0.35 and 0.93, respectively.
+                </div>
+            </div>
+        </li>
+        <li>
+            <strong>Convert Back to RGB:</strong>
+            Convert the image back to the RGB color space for display.
+        </li>
+    </ol>
+
+    <div class="flex justify-center p-4">
+        <img src="output/auto_contrasted_large/lady.jpg" class="h-96">
+        <img src="output/better_color_mapped_large/lady.jpg" class="pl-8 h-96">
+    </div>
+
+    <p class="text-xl p-4 text-gray-500">
+        The upper-left image is the lady image before better color mapping, and the upper-right image is the lady image
+        after better color mapping.
+    </p>
+
+    <h2 class="text-3xl font-bold p-4" id="all-results">All results</h2>
+    <p class="text-xl p-4">
+        All results are shown below (aligned, cropped, auto-contrasted, and better color mapped):
+    </p>
+
+    <p class="text-2xl p-4">
+        <strong>Lower resolution images:</strong>
+    </p>
+
+    <p class="text-xl p-4">
+        <strong>cathedral:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/small/cathedral.jpg" class="h-48">
+        <img src="output/cropped_small/cathedral.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_small/cathedral.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_small/cathedral.jpg" class="pl-4 h-48">
+    </div>
+
+    <p class="text-xl p-4">
+        <strong>monastery:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/small/monastery.jpg" class="h-48">
+        <img src="output/cropped_small/monastery.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_small/monastery.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_small/monastery.jpg" class="pl-4 h-48">
+    </div>
+
+    <p class="text-xl p-4">
+        <strong>tobolsk:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/small/tobolsk.jpg" class="h-48">
+        <img src="output/cropped_small/tobolsk.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_small/tobolsk.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_small/tobolsk.jpg" class="pl-4 h-48">
+    </div>
+
+    <p class="text-2xl p-4">
+        <strong>Higher resolution images:</strong>
+    </p>
+
+    <p class="text-xl p-4">
+        <strong>church:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/large/church.jpg" class="h-48">
+        <img src="output/cropped_large/church.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_large/church.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_large/church.jpg" class="pl-4 h-48">
+    </div>
+
+    <p class="text-xl p-4">
+        <strong>emir:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/large/emir.jpg" class="h-48">
+        <img src="output/cropped_large/emir.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_large/emir.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_large/emir.jpg" class="pl-4 h-48">
+    </div>
+
+    <p class="text-xl p-4">
+        <strong>harvesters:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/large/harvesters.jpg" class="h-48">
+        <img src="output/cropped_large/harvesters.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_large/harvesters.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_large/harvesters.jpg" class="pl-4 h-48">
+    </div>
+
+    <p class="text-xl p-4">
+        <strong>icon:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/large/icon.jpg" class="h-48">
+        <img src="output/cropped_large/icon.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_large/icon.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_large/icon.jpg" class="pl-4 h-48">
+    </div>
+
+    <p class="text-xl p-4">
+        <strong>lady:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/large/lady.jpg" class="h-48">
+        <img src="output/cropped_large/lady.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_large/lady.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_large/lady.jpg" class="pl-4 h-48">
+    </div>
+
+    <p class="text-xl p-4">
+        <strong>melons:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/large/melons.jpg" class="h-48">
+        <img src="output/cropped_large/melons.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_large/melons.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_large/melons.jpg" class="pl-4 h-48">
+    </div>
+
+    <p class="text-xl p-4">
+        <strong>onion_church:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/large/onion_church.jpg" class="h-48">
+        <img src="output/cropped_large/onion_church.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_large/onion_church.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_large/onion_church.jpg" class="pl-4 h-48">
+    </div>
+
+    <p class="text-xl p-4">
+        <strong>sculpture:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/large/sculpture.jpg" class="h-48">
+        <img src="output/cropped_large/sculpture.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_large/sculpture.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_large/sculpture.jpg" class="pl-4 h-48">
+    </div>
+
+    <p class="text-xl p-4">
+        <strong>self_portrait:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/large/self_portrait.jpg" class="h-48">
+        <img src="output/cropped_large/self_portrait.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_large/self_portrait.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_large/self_portrait.jpg" class="pl-4 h-48">
+    </div>
+
+    <p class="text-xl p-4">
+        <strong>three_generations:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/large/three_generations.jpg" class="h-48">
+        <img src="output/cropped_large/three_generations.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_large/three_generations.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_large/three_generations.jpg" class="pl-4 h-48">
+    </div>
+
+    <p class="text-xl p-4">
+        <strong>train:</strong>
+    </p>
+    <div class="flex justify-center p-4">
+        <img src="output/large/train.jpg" class="h-48">
+        <img src="output/cropped_large/train.jpg" class="pl-4 h-48">
+        <img src="output/auto_contrasted_large/train.jpg" class="pl-4 h-48">
+        <img src="output/better_color_mapped_large/train.jpg" class="pl-4 h-48">
+    </div>
+</body>
+
+</html>
