@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+        integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+    <!-- The loading of KaTeX is deferred to speed up page rendering -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+        integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg"
+        crossorigin="anonymous"></script>
+    <!-- To automatically render math in text elements, include the auto-render extension: -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"
+        onload="renderMathInElement(document.body);"></script>
+    <title>Project 2: Fun with Filters and Frequencies!</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+</head>
+
+<body class="container mx-auto p-4">
+    <h1 class="text-3xl font-bold text-center">Fun with Filters and Frequencies!</h1>
+    <p class="text-2xl text-center p-4">
+        Yueheng Zeng
+        <span class="font-bold text-rose-500">@</span>
+        Project 2
+    </p>
+    <h2 class="text-3xl font-bold p-4">Overview</h2>
+    <p class="text-xl p-4">
+        This project explores various techniques in image processing, focusing on 2D convolutions and frequency-based
+        transformations. The goal is to build foundational intuitions about how filters affect images and to experiment
+        with
+        advanced image manipulation techniques, including sharpening, hybrid image creation, and multi-resolution
+        blending.
+    </p>
+
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-4/banana_minion_reconstructed_image.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the result of blending a banana and a minion using multi-resolution blending.
+    </p>
+
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-2/mango_emperor_hybrid_images_color.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above is the hybrid image of a mango and the Hongwu Emperor (whose portrait looks like a mango).
+    </p>
+
+    <h2 class="text-3xl font-bold p-4">Table of Contents</h2>
+    <ol class="text-xl pl-9 list-disc p-4 text-blue-500">
+        <li>
+            <a class="underline" href="#1-1">
+                Part 1.1: Finite Difference Operator
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#1-2">
+                Part 1.2: Derivative of Gaussian (DoG) Filter
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2-1">
+                Part 2.1: Image "Sharpening"
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2-2">
+                Part 2.2: Hybrid Images
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2-2-1">
+                Part 2.2.1: Mango Emperor (My Favorite Hybrid Image)
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2-2-2">
+                Part 2.2.2: Shenzhen in 1982 and 2018
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2-2-3">
+                Part 2.2.3: Is that a Mouse?
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2-3">
+                Part 2.3: Gaussian and Laplacian Stacks
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2-4">
+                Part 2.4: Multi-Resolution Blending
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2-4-1">
+                Part 2.4.1: Banana-Minion
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2-4-2">
+                Part 2.4.2: Laptop-Button
+            </a>
+        </li>
+    </ol>
+
+    <h2 class="text-3xl font-bold p-4" id=1-1">Part 1.1: Finite Difference Operator</h2>
+    <p class="text-xl p-4">
+        This part explores the use of finite difference operators to compute the gradient of an image. The gradient is
+        computed using two filters: dx and dy. The dx filter computes the gradient in the x-direction, while the dy
+        filter
+        computes the gradient in the y-direction.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/1-1/convolved_images.jpg" class="h-96">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the results of convolving the cameraman image with the dx and dy filters.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/1-1/gradient_magnitude.jpg" class="h-96">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the gradient magnitude of the cameraman image.
+    </p>
+
+    <h2 class="text-3xl font-bold p-4" id="1-2">Derivative of Gaussian (DoG) Filter</h2>
+    <p class="text-xl p-4">
+        This part explores the use of the derivative of Gaussian (DoG) filter to compute the gradient of an image. The
+        DoG
+        filter is a combination of a Gaussian filter and a derivative filter. The Gaussian filter is used to smooth the
+        image, while the derivative filter is used to compute the gradient.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/1-2/smoothed_image.jpg" class="h-96">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the result of convolving the cameraman image with the Gaussian filter.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/1-2/gradient_magnitude_smoothed.jpg" class="h-96">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the gradient magnitude of the smoothed cameraman image.
+    </p>
+    <p class="text-xl p-4">
+        By comparing the results of the finite difference operator and the DoG filter, we can see the following
+        differences:
+    <ul class="list-disc pl-9 p-4">
+        <li>The finite difference operator is more sensitive to noise, while the DoG filter is less sensitive to
+            noise.</li>
+        <li>The finite difference operator produces finer edges, while the DoG filter produces bold edges.</li>
+        <li>The edges produced by the finite difference operator are more jagged, while the edges produced by the DoG
+            filter are smoother.</li>
+    </ul>
+    </p>
+    <p class="text-xl p-4">
+        We can combine the Gaussian filter and the derivative filter into a single filter called the DoG filter.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/1-2/dog_x.jpg" class="h-96">
+        <img src="output/1-2/dog_y.jpg" class="h-96">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The images above show the DoG filters in the x-direction and y-direction.
+    </p>
+    <p class="text-xl p-4">
+        We can convolve the cameraman image with the DoG filters directly to compute the gradient after smoothing the
+        image. The following images show the results of convolving the cameraman image directly with the DoG filters is
+        the same as convolving the smoothed image with the finite difference operator.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/1-2/binary_gradient_magnitude_dog.jpg" class="h-96">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The left image above is the gradient magnitude of the smoothed cameraman image convolved with the gradient
+        filters. The right image above is the gradient magnitude of the cameraman image convolved with the DoG filters.
+    </p>
+
+    <h2 class="text-3xl font-bold p-4" id="2-1">Part 2.1: Image "Sharpening"</h2>
+    <p class="text-xl p-4">
+        This part explores the use of unsharp masking technique to sharpen an image. The unsharp masking technique
+        involves subtracting a blurred version of the image from the original image to enhance the edges.
+        We can derive the unsharp masking filter by subtracting the Gaussian filter from the unit impulse filter.
+
+        \[
+        \text{{unsharp\_masking\_filter}} = (1 + \alpha) \times \text{{unit\_impulse\_filter}} - \alpha \times
+        \text{{gaussian\_filter}}
+        \]
+
+        where \(\alpha\) is a parameter that controls the strength of the sharpening effect.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-1/unsharp_mask_filter_alpha_1.jpg" class="h-96">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the unsharp masking filter with alpha = 1.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-1/taj_sharpened_images.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the results of sharpening the Taj image with the unsharp masking filter of different
+        alphas.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-1/blurry_sharpened_images.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the results of sharpening a out of focus image with the unsharp masking filter of
+        different alphas. We can see that after sharpening, the edges become more pronounced and the details become
+        clearer. However, the sharpening effect can also enhance noise and artifacts in the image.
+    </p>
+    <p class="text-xl p-4">
+        Some other photos taken by me are also sharpened using the unsharp masking filter. The results are shown below.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-1/campanile_sharpened_images.jpg" class="w-full">
+    </div>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-1/chinatown_sharpened_images.jpg" class="w-full">
+    </div>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-1/foothill_sharpened_images.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4">
+        The results of blurring a sharp image and then sharpening it are shown below.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-1/blurred_sharp_sharpened_images.jpg" class="w-full">
+    </div>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-1/square_blurred_sharp_sharpened_images.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4">
+        Although the sharpened image is sharper than the blurred image, it is still different from the original image in
+        the following ways:
+    <ul class="list-disc pl-9 p-4">
+        <li>The sharpened image has more noise than the original image. In the foothill image, the noise is clearly
+            visible in the sky.</li>
+        <li>The sharpened image has more artifacts than the original image. In the generated square image, the artifacts
+            are visible as the corners of the square are not orthogonal.</li>
+    </ul>
+    </p>
+
+    <h2 class="text-3xl font-bold p-4" id="2-2">Part 2.2: Hybrid Images</h2>
+    <p class="text-xl p-4">
+        This part explores the creation of hybrid images by combining the low-frequency components of one image with the
+        high-frequency components of another image. The low-frequency components are obtained by applying a Gaussian
+        filter to the first image, while the high-frequency components are obtained by subtracting the Gaussian-filtered
+        image from the original image.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-2/cat_man_hybrid_images.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the sample hybrid image of a cat and a man. The low-frequency components of the man image
+        are combined with the high-frequency components of the cat image to create the hybrid image.
+    </p>
+
+    <h3 class="text-2xl font-bold p-4" id="2-2-1">Part 2.2.1: Mango Emperor (My Favorite Hybrid Image)</h3>
+    <p class="text-xl p-4">
+        The Hongwu Emperor (1328-1398) of the Ming Dynasty is known for his distinctive appearance, which some say
+        resembles a mango 🤣.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-2/mango_emperor_aligned_images.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The images above show the aligned images of the mango and the Hongwu Emperor and the hybrid image of the two
+        images.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-2/mango_emperor_hybrid_images.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the hybrid image of the mango and the Hongwu Emperor. The low-frequency components of the
+        mango image are combined with the high-frequency components of the Hongwu Emperor image to create the hybrid
+        image.
+    </p>
+    <p class="text-xl p-4">
+        We can conduct some frequency analysis on the hybrid image to understand how the low-frequency and
+        high-frequency
+        components are combined. The following images are the log magnitude of the Fourier transform of the mango
+        image, the Hongwu Emperor image, and the hybrid image.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-2/mango_emperor_spectrum.jpg" class="w-full">
+    </div>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-2/mango_emperor_hybrid_spectrum.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4">
+        We can see that the mango image after low-pass filtering has less high-frequency components, while the Hongwu
+        Emperor image after high-pass filtering has more high-frequency components. The hybrid image combines the
+        low-frequency components of the mango image with the high-frequency components of the Hongwu Emperor image.
+    </p>
+    <p class="text-xl p-4">
+        The hybrid image can also be created in color by retaining any color information in the two images. The
+        following
+        image shows the hybrid image of the mango and the Hongwu Emperor in color.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-2/mango_emperor_hybrid_images_color.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The left image above retains the color information of both images. The middle image above retains the color
+        information of the mango image. The right image above retains the color information of the Hongwu Emperor image.
+    </p>
+    <p class="text-xl p-4">
+        After trying different color combinations, I found that the best color combination for enhancing the effect of
+        the
+        hybrid image is to use the color of the high-frequency image as the color of the hybrid image while keeping the
+        low-frequency image in grayscale.
+    </p>
+    <p class="text-xl p-4">
+        I think the main reason for this is that a common problem with hybrid images is that the low-frequency image is
+        often
+        too dominant, and using color on the high-frequency image helps to make the high-frequency image more prominent
+        at a
+        closer distance while still allowing the low-frequency image to be visible at a farther distance.
+    </p>
+
+    <h3 class="text-2xl font-bold p-4" id="2-2-2">Part 2.2.2: Shenzhen in 1982 and 2018</h3>
+    <p class="text-xl p-4">
+        The following images show the hybrid images of Shenzhen in 1982 and 2018. The low-frequency components of the
+        1982
+        image are combined with the high-frequency components of the 2018 image to create the hybrid image.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-2/shenzhen_hybrid_images.jpg" class="w-full">
+    </div>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-2/shenzhen_hybrid_images_color.jpg" class="w-full">
+    </div>
+
+    <h3 class="text-2xl font-bold p-4" id="2-2-3">Part 2.2.3: Is that a Mouse?</h3>
+    <p class="text-xl p-4">
+        The following images show the hybrid images of a mouse and a computer mouse. The low-frequency components of the
+        mouse image are combined with the high-frequency components of the computer mouse image to create the hybrid
+        image.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-2/mouse_hybrid_images.jpg" class="w-full">
+    </div>
+
+    <h2 class="text-3xl font-bold p-4" id="2-3">Part 2.3: Gaussian and Laplacian Stacks</h2>
+    <p class="text-xl p-4">
+        This part explores the creation of Gaussian and Laplacian stacks for multi-resolution blending. The Gaussian
+        stack
+        is created by applying a series of Gaussian filters to the original image, while the Laplacian stack is
+        created by
+        subtracting the Gaussian-filtered image from the original image.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-3/blended_reconstructed_image.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the result of blending an apple and an orange using multi-resolution blending.
+        I used \(\sigma = 3\) for the Gaussian filter and 50 levels for the Gaussian and Laplacian stacks.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-3/apple_laplacian_stack_masked.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the Laplacian stack of the apple image with the mask applied to each level.
+        This corresponds to the left column of Figure 3.42 in the textbook.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-3/orange_laplacian_stack_masked.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the Laplacian stack of the orange image with the mask applied to each level.
+        This corresponds to the middle column of Figure 3.42 in the textbook.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-3/blended_laplacian_stack.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the Laplacian stack of the blended image.
+        This corresponds to the right column of Figure 3.42 in the textbook.
+    </p>
+
+    <h2 class="text-3xl font-bold p-4" id="2-4">Part 2.4: Multi-Resolution Blending</h2>
+    <p class="text-xl p-4">
+        This part explores the use of multi-resolution blending to blend two images seamlessly. The blending process
+        involves creating Gaussian and Laplacian stacks for both images, blending the corresponding levels of the
+        Laplacian stacks, and reconstructing the blended image from the blended Laplacian stack.
+    </p>
+
+    <h3 class="text-2xl font-bold p-4" id="2-4-1">Part 2.4.1: Banana-Minion</h3>
+    <p class="text-xl p-4">
+        We all know that minions love bananas 🍌. The following images show the blending of a banana and a minion using
+        multi-resolution blending.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-4/banana_minion_reconstructed_image.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the result of blending a banana and a minion using multi-resolution blending.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-4/banana_laplacian_stack_masked.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the Laplacian stack of the banana image with the mask applied to each level.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-4/minion_laplacian_stack_masked.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the Laplacian stack of the minion image with the mask applied to each level.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-4/banana_minion_blended_laplacian_stack.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the Laplacian stack of the blended image.
+    </p>
+
+    <h3 class="text-2xl font-bold p-4" id="2-4-2">Part 2.4.2: Laptop-Button</h3>
+    <p class="text-xl p-4">
+        The following images show the blending of the back of a laptop and a red alarm button using multi-resolution
+        blending.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-4/laptop_button_reconstructed_image.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the result of blending the back of a laptop and a red alarm button using multi-resolution
+        blending.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-4/laptop_laplacian_stack_masked.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the Laplacian stack of the laptop image with the mask applied to each level.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-4/button_laplacian_stack_masked.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the Laplacian stack of the button image with the mask applied to each level.
+    </p>
+    <div class="flex justify-center p-4 flex-wrap">
+        <img src="output/2-4/laptop_button_blended_laplacian_stack.jpg" class="w-full">
+    </div>
+    <p class="text-xl p-4 text-gray-500">
+        The image above shows the Laplacian stack of the blended image.
+    </p>
+</body>
+
+</html>
