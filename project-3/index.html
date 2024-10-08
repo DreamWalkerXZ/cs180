@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+        integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+    <!-- The loading of KaTeX is deferred to speed up page rendering -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+        integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg"
+        crossorigin="anonymous"></script>
+    <!-- To automatically render math in text elements, include the auto-render extension: -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"
+        onload="renderMathInElement(document.body);"></script>
+    <title>Project 3: Face Morphing</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+</head>
+
+<body class="container mx-auto p-2">
+    <h1 class="text-3xl font-bold text-center">Face Morphing</h1>
+    <p class="text-2xl text-center p-2">
+        Yueheng Zeng
+        <span class="font-bold text-rose-500">@</span>
+        Project 3
+    </p>
+    <h2 class="text-3xl font-bold p-2">Overview</h2>
+    <p class="text-xl p-2">
+        This project involves implementing face morphing and image manipulation techniques using computational
+        photography. The
+        primary goals are to morph an image of your face into someone else's face, compute the average face of a given
+        population, and create a caricature by extrapolating from the population mean.
+    </p>
+
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/yueheng_to_ruihuan.gif" class="h-64">
+        <img src="output/yueheng_inverse_laughing_extrapolated_to_laughing_extrapolated.gif" class="pl-8 h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        <b>Left:</b> Morphing from me to Ruihuan.
+        <br>
+        <b>Right:</b> Extrapolating from the inverse of my laughing face to
+        laughing face.
+    </p>
+
+    <h2 class="text-3xl font-bold p-2">Table of Contents</h2>
+    <ol class="text-xl pl-9 list-disc p-2 text-blue-500">
+        <li>
+            <a class="underline" href="#1">
+                Part 1: Defining Correspondences
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2">
+                Part 2: Computing the "Mid-way Face"
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#3">
+                Part 3: The Morph Sequence
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#4">
+                Part 4: The "Mean Face" of a Population
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#5">
+                Part 5: Caricatures - Extrapolating from the Mean
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#6">
+                Bells and Whistles: Change Smile
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#7">
+                Bells and Whistles: A PCA Basis
+            </a>
+        </li>
+    </ol>
+
+    <h2 id="1" class="text-3xl font-bold p-2">Part 1: Defining Correspondences</h2>
+    <p class="text-xl p-2">
+        To define pairs of corresponding points on the two images by hand, I wrote a Python script that allows users to
+        click on the images to select points. The script displays the images side by side and allows users to click on
+        corresponding points on the two images. The script saves the selected points to a json file for later use.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="img/obtain_correspondences.png" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Python script for defining corresponding points on two images.
+    </p>
+    <p class="text-xl p-2">
+        After obtaining the corresponding points, the midway shape can be computed by averaging the corresponding
+        points.
+        Then, the Delaunay triangulation can be computed on the midway shape.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/yueheng_ruihuan_scaled_triangulation.png" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Delaunay triangulation calculated on the midway shape.
+    </p>
+
+    <h2 id="2" class="text-3xl font-bold p-2">Part 2: Computing the "Mid-way Face"</h2>
+    <p class="text-xl p-2">
+        To compute the midway face, we first need to warp the two images to the midway shape already computed in the
+        previous
+        part. Then we average the colors of the two images to get the midway face.
+    </p>
+    <p class="text-xl p-2">
+        To warp the images, we first compute the affine transformation matrix for each triangle in the Delaunay
+        triangulation. The affine transformation matrix we need is defined as follows:
+        $$
+        \text{target triangle} = \text{affine matrix} \times \text{source triangle}
+        $$
+        where the source triangle and target triangle are defined as follows:
+        $$
+        \text{source triangle} = \begin{bmatrix} x_1 & x_2 & x_3 \\ y_1 & y_2 & y_3 \\ 1 & 1 & 1 \end{bmatrix}
+        $$
+        $$
+        \text{target triangle} = \begin{bmatrix} x'_1 & x'_2 & x'_3 \\ y'_1 & y'_2 & y'_3 \\ 1 & 1 & 1 \end{bmatrix}
+        $$
+        And the affine matrix is defined as follows:
+        $$
+        \text{affine matrix} = \begin{bmatrix} a & b & c \\ d & e & f \\ 0 & 0 & 1 \end{bmatrix}
+        $$
+        We can see that the affine matrix has 6 unknowns, and we can solve for these unknowns by solving the linear
+        system as follows:
+        $$
+        \text{affine matrix} = \text{target triangle} \times \text{source triangle}^{-1}
+        $$
+    </p>
+    <p class="text-xl p-2">
+        To avoid holes in the warped image (midway face), we can use the inverse warping technique. Instead of warping
+        the source
+        image to the midway face, we warp the midway face to the source image. For a point \( (x_{mid}, y_{mid}) \) in
+        the midway face, we can find the corresponding point in the source image with \( (x_{src}, y_{src}) \) by the
+        following
+        formula:
+        $$
+        (x_{src}, y_{src}, 1) = \text{affine matrix} \times (x_{mid}, y_{mid}, 1)
+        $$
+        However, the above formula may result in fractional coordinates in the source image. To solve this problem, we
+        can use interpolation to get the pixel value at the fractional coordinates. This can be easily done using the
+        <span class="font-mono">scipy.interpolate.griddata</span> function. Since this function is slow, we can use it
+        after we have computed the affine matrix for all the triangles.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/yueheng_ruihuan_scaled_midway_face.png" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Midway face computed from me and Ruihuan.
+    </p>
+
+    <h2 id="3" class="text-3xl font-bold p-2">Part 3: The Morph Sequence</h2>
+    <p class="text-xl p-2">
+        To create the morph sequence, the only difference from the previous part is that we need involve two parameters:
+        the parameter to control the intermidiate shape and the parameter to control the color blending. They are
+        defined
+        as follows:
+        $$
+        \text{warp fraction} = \frac{t}{\text{number of frames} - 1}
+        $$
+        $$
+        \text{color fraction} = \frac{t}{\text{number of frames} - 1}
+        $$
+        where \( t \) ranges from \( 0 \) to \( \text{number of frames} - 1 \).
+        By looping through all the frames, we can create the morph sequence.
+        Moreover, if we want to create a ping-pong effect (morphing from the source to the target and then from the
+        target), we can just append the morph sequence with the morph sequence
+        in reverse order.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/yueheng_to_ruihuan.gif" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Morph sequence from me to Ruihuan.
+    </p>
+
+    <h2 id="4" class="text-3xl font-bold p-2">Part 4: The "Mean Face" of a Population</h2>
+    <p class="text-xl p-2">
+        The dataset used in this part is <a href="https://fei.edu.br/~cet/facedatabase.html">the FEI face database</a>.
+        The dataset has spatially normalized images of frontal faces of 200 individuals with 46 annonated points.
+        Each of the individuals has an image
+        with a neutral expression and an image with a laughing expression. Therefore, we can compute the mean face of
+        neutral expressions and the mean face of laughing expressions.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/normal_average_face.jpg" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Mean face of neutral expressions.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/laughing_average_face.jpg" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Mean face of laughing expressions.
+    </p>
+    <p class="text-xl p-2">
+        With the mean face of laughing expressions, we can make some individuals laugh by warping their neutral
+        expressions to the mean face of laughing expressions. Some of the results are shown below.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/7a_to_laughing.gif" class="p-2 h-64">
+        <img src="output/83a_to_laughing.gif" class="p-2 h-64">
+        <img src="output/134a_to_laughing.gif" class="p-2 h-64">
+        <img src="output/163a_to_laughing.gif" class="p-2 h-64">
+        <img src="output/175a_to_laughing.gif" class="p-2 h-64">
+        <img src="output/yueheng_to_laughing.gif" class="p-2 h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        The first five images are individuals from the FEI face database. The last image is me.
+    </p>
+    <p class="text-xl p-2">
+        We can see that the results better on those individuals in the FEI face database than on me.
+        This might be because the individuals in the FEI face database have a more similar face shape to the mean face
+        of laughing expressions than me.
+    </p>
+
+    <h2 id="5" class="text-3xl font-bold p-2">Part 5: Caricatures - Extrapolating from the Mean</h2>
+    <p class="text-xl p-2">
+        To create a caricature of my face, we can extrapolate from the mean face of Chinese males to my face.
+        The process can be shown as follows:
+        $$
+        \text{extrapolate vector} = \text{my face shape} - \text{mean face shape}
+        $$
+        $$
+        \text{caricature shape} = \text{mean face shape} + \text{factor} \times \text{extrapolate vector}
+        $$
+        where the factor is a parameter to control the exaggeration of the caricature.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/yueheng_extrapolate.jpg" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        My face.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/average_chinese_man.jpg" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Mean face of Chinese males.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/yueheng_inverse_extrapolated_to_extrapolated.gif" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Caricature of my face from the mean face with factor -1 to 1.
+    </p>
+
+    <h2 id="6" class="text-3xl font-bold p-2">Bells and Whistles: Change Smile</h2>
+    <p class="text-xl p-2">
+        To change the smile of an individual, we can subtract the mean face of neutral expressions from the mean face of
+        laughing expressions to get the smile vector. Then we can add the smile vector to the individual's face to make
+        them smile.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/yueheng_to_laughing_extrapolated.gif" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Smile vector applied to my face.
+    </p>
+    <p class="text-xl p-2">
+        If we subtract the smile vector from someone's face, we can make them not smile, or even make them frown.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/yueheng_to_inverse_laughing_extrapolated.gif" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Inverse smile vector applied to my face.
+    </p>
+
+    <h2 id="7" class="text-3xl font-bold p-2">Bells and Whistles: A PCA Basis</h2>
+    <p class="text-xl p-2">
+        To perform PCA on the face shapes of the individuals in the FEI face database, we first need to flatten the face
+        shapes into vectors (one vector for each face shape, each has 100 dimensions). Then we need to standardize the
+        vectors. After that, we
+        can
+        perform PCA on the standardized vectors.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/explained_variance_ratio.png" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Explained variance ratio of the PCA.
+    </p>
+    <p class="text-xl p-2">
+        We can see that just the first 10 PCA components can explain 80% of the variance in the data.
+        Therefore, it is reasonable to use the first 10 PCA components as the basis for the face shapes.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/pc5_scatter_plot.png" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Scatter plot of the fifth PCA component.
+    </p>
+    <p class="text-xl p-2">
+        We can see that the fifth PCA component is positively correlated with the smile of the face shapes.
+        We can further confirm this by projecting the smile vector to the PCA basis and see that the smile vector is
+        mostly aligned with the fifth PCA component.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/normal_to_laughing_vector_pca.png" class="h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Smile vector projected to the PCA basis.
+    </p>
+    <p class="text-xl p-2">
+        We can see that the smile vector has high values on the fifth PCA component.
+        Therefore, we can use the fifth PCA component as the smile vector.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/face_to_reconstructed.gif" class="h-64">
+        <img src="output/face_to_laughing_extrapolated.gif" class="pl-8 h-64">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        <b>Left:</b> Laughing face generated by increasing the fifth PCA component.
+        <br>
+        <b>Right:</b> Laughing face generated by adding the smile vector to the face.
+    </p>
+    <p class="text-xl p-2">
+        We can see that the result on the left is similar to the result on the right.
+        So in this case, making transformations in the PCA space similar to making transformations in the normal basis.
+    </p>
+</body>
+
+</html>
