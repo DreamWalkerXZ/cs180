@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+        integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+    <!-- The loading of KaTeX is deferred to speed up page rendering -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+        integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg"
+        crossorigin="anonymous"></script>
+    <!-- To automatically render math in text elements, include the auto-render extension: -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"
+        onload="renderMathInElement(document.body);"></script>
+    <title>Project 4A: Image Warping and Mosaicing</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+</head>
+
+<body class="container mx-auto p-2">
+    <h1 class="text-3xl font-bold text-center">Image Warping and Mosaicing</h1>
+    <p class="text-2xl text-center p-2">
+        Yueheng Zeng
+        <span class="font-bold text-rose-500">@</span>
+        Project 4A
+    </p>
+    <h2 class="text-3xl font-bold p-2">Overview</h2>
+    <p class="text-xl p-2">
+        In this project, I implemented image mosaicing. The goal is to create a mosaic of two images taken
+        from different angles but with the same center of projection. This involves recovering homographies between
+        the two images, warping the images, and blending them into a mosaic.
+    </p>
+
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/correspondences.png" class="h-72">
+        <img src="output/alpha_blending.png" class="pl-8 h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        <b>Left:</b> Defined correspondences between two images.
+        <br>
+        <b>Right:</b> Created mosaic of two images.
+    </p>
+
+    <h2 class="text-3xl font-bold p-2">Table of Contents</h2>
+    <ol class="text-xl pl-9 list-disc p-2 text-blue-500">
+        <li>
+            <a class="underline" href="#1">
+                Part 1: Shoot the Pictures
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2">
+                Part 2: Recover Homographies
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#3">
+                Part 3: Warp the Images
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#4">
+                Part 4: Image Rectification
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#5">
+                Part 5: Blend the Images into a Mosaic
+            </a>
+        </li>
+    </ol>
+
+    <h2 id="1" class="text-3xl font-bold p-2">Part 1: Shoot the Pictures</h2>
+    <p class="text-xl p-2">
+        To be able to create a mosaic of two images, we first need to take two pictures of the same scene from
+        different angles but with the same center of projection. The two images should have a significant overlap
+        between them. I took two pictures of my living room from two different angles with my phone camera.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/correspondences.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        My two images of the living room with defined correspondences.
+    </p>
+
+    <h2 id="2" class="text-3xl font-bold p-2">Part 2: Recover Homographies</h2>
+    <p class="text-xl p-2">
+        The homography matrix \(\mathbf{H}\) describes a transformation between two planes. Given a set of corresponding
+        points
+        from two images, we aim to compute the homography matrix that maps points from one image to the other.
+
+        Let the correspondence between the two images be given by points \(\mathbf{p}_1 = (x_1, y_1)\) in the first
+        image
+        and
+        \(\mathbf{p}_2 = (x_2, y_2)\) in the second image. The homography relates these points via the equation:
+        \[
+        \begin{bmatrix}
+        x_2 \\
+        y_2 \\
+        1
+        \end{bmatrix}
+        \propto
+        \mathbf{H}
+        \begin{bmatrix}
+        x_1 \\
+        y_1 \\
+        1
+        \end{bmatrix}.
+        \]
+        The goal is to compute the \(3 \times 3\) homography matrix \(\mathbf{H}\)
+
+        For each pair of corresponding points \(\mathbf{p}_1 = (x_1, y_1)\) and \(\mathbf{p}_2 = (x_2, y_2)\) we derive
+        two
+        linear
+        equations from the homography relationship:
+        \[
+        \begin{aligned}
+        x_2 &= h_{11} x_1 + h_{12} y_1 + h_{13} - h_{31} x_1 x_2 - h_{32} y_1 x_2, \\
+        y_2 &= h_{21} x_1 + h_{22} y_1 + h_{23} - h_{31} x_1 y_2 - h_{32} y_1 y_2.
+        \end{aligned}
+        \]
+        Rearranging these into a system of equations for \(n\) pairs of points leads to the matrix form:
+        \[
+        \mathbf{A} \mathbf{h} = \mathbf{b},
+        \]
+        where \(\mathbf{A}\) is a \(2n \times 8\) matrix constructed from the points in the first image, and
+        \(\mathbf{b}\) is
+        a \(2n
+        \times 1\) vector constructed from the points in the second image.
+
+        For each correspondence, the rows of \(\mathbf{A}\) are given by:
+        \[
+        \mathbf{A} =
+        \begin{bmatrix}
+        x_1 & y_1 & 1 & 0 & 0 & 0 & -x_1 x_2 & -y_1 x_2 \\
+        0 & 0 & 0 & x_1 & y_1 & 1 & -x_1 y_2 & -y_1 y_2
+        \end{bmatrix},
+        \]
+        and the vector \(\mathbf{b}\) is:
+        \[
+        \mathbf{b} =
+        \begin{bmatrix}
+        x_2 \\
+        y_2
+        \end{bmatrix}.
+        \]
+
+        To compute the homography matrix, we solve the least-squares problem:
+        \[
+        \mathbf{h} = \text{argmin} \|\mathbf{A} \mathbf{h} - \mathbf{b}\|.
+        \]
+        This is solved using the function <b>np.linalg.lstsq</b>, which provides the best-fit solution to this system.
+        The
+        resulting vector \(\mathbf{h}\) contains the first 8 elements of the homography matrix. The final element
+        \(h_{33}\)
+        is set
+        to 1, and \(\mathbf{h}\) is reshaped into a \(3 \times 3\) matrix:
+        \[
+        \mathbf{H} =
+        \begin{bmatrix}
+        h_{11} & h_{12} & h_{13} \\
+        h_{21} & h_{22} & h_{23} \\
+        h_{31} & h_{32} & 1
+        \end{bmatrix}.
+        \]
+    </p>
+
+    <h2 id="3" class="text-3xl font-bold p-2">Part 3: Warp the Images</h2>
+    <p class="text-xl p-2">
+        To warp an image, we need to apply the homography matrix \(\mathbf{H}\) to each pixel in the image. To determine
+        the
+        size of the destination image, we first apply the homography to the four corners of the source image. The
+        destination image is then defined as the bounding box that contains all the transformed corner points. If the
+        warped corner points are negative, we shift the image to ensure all points are positive.
+    </p>
+    <p class="text-xl p-2">
+        To avoid holes in the destination image, we can adopt the inverse warping approach. For each pixel \((x, y)\) in
+        in the destination image, we compute the corresponding pixel \((x', y')\) in the source image by
+        applying the inverse homography matrix \(\mathbf{H}^{-1}\):
+        \[
+        \begin{bmatrix}
+        x' \\
+        y' \\
+        1
+        \end{bmatrix}
+        \propto
+        \mathbf{H}^{-1}
+        \begin{bmatrix}
+        x \\
+        y \\
+        1
+        \end{bmatrix}.
+        \]
+        The pixel \((x', y')\) is then interpolated from the source image to the destination image using bilinear
+        interpolation.
+    </p>
+
+    <h2 id="4" class="text-3xl font-bold p-2">Part 4: Image Rectification</h2>
+    <p class="text-xl p-2">
+        After implementing the warp function, we can rectify elements in the image. To rectify an element, we need to
+        compute the homography matrix that maps the element to a rectangle. We can then apply the warp
+        function to the element to rectify it.
+    </p>
+    <p class="text-xl p-2">
+        In the example below, I rectified the picture frame in my living room by letting the four corners of the frame
+        map to the four corners of a rectangle. The resulting rectified frame is shown below.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/rectification.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Rectified picture frame in my living room.
+    </p>
+
+    <h2 id="5" class="text-3xl font-bold p-2">Part 5: Blend the Images into a Mosaic</h2>
+    <p class="text-xl p-2">
+        To blend the images into a mosaic, we can project one image onto the other using the homography matrix.
+
+        In the example below, I warped the first image onto the second image, and created a mask with the
+        warped pixels in the first image being set to 1 and the rest to 0. From the result, we can see that the key
+        points
+        are well aligned, and the two images are ready to be blended.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/image1_warped_image2_expanded_mask.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Warped image 1, Expanded image 2, and Mask.
+    </p>
+    <p class="text-xl p-2">
+        To blend the images, we can directly blend the images using the mask we just created. The blending is done by
+        setting the pixel value to the first image if the mask is 1 and the second image if the mask is 0. The result is
+        shown below. We can see that the two images are well blended into a mosaic. However, the blending is not
+        perfect, and we can see a boundary between the two images.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/direct_blending.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Direct blending of the two images.
+    </p>
+    <p class="text-xl p-2">
+        To improve the blending, we can cross dissolve the images at the overlapping region. The cross-dissolve can be
+        done
+        with the following masks that linearly interpolate between the two images.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/alpha_masks.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Alpha masks for cross-dissolve.
+    </p>
+    <p class="text-xl p-2">
+        We can then blend the images using the masks above. As for those pixels that are not in the overlapping region,
+        we can directly blend the images using the mask we created earlier. The result is shown below. We can see that
+        the blending is much smoother, and the boundary between the two images is not visible.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/alpha_blending.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Cross-dissolve blending of the two images.
+    </p>
+</body>
+
+</html>
