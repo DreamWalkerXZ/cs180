@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+        integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+    <!-- The loading of KaTeX is deferred to speed up page rendering -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+        integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg"
+        crossorigin="anonymous"></script>
+    <!-- To automatically render math in text elements, include the auto-render extension: -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"
+        onload="renderMathInElement(document.body);"></script>
+    <title>Project 4: Auto Stitching Photo Mosaics</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+</head>
+
+<body class="container mx-auto p-2">
+    <h1 class="text-3xl font-bold text-center">Auto Stitching Photo Mosaics</h1>
+    <p class="text-2xl text-center p-2">
+        Yueheng Zeng
+        <span class="font-bold text-rose-500">@</span>
+        Project 4
+    </p>
+    <h2 class="text-3xl font-bold p-2">Overview</h2>
+    <p class="text-xl p-2">
+        This project focuses on auto stitching photo mosaics. It is
+        divided into two main parts: the first involves capturing source images, establishing correspondences, and
+        manually warping and compositing them into a mosaic. The second part aims to automate the
+        correspondence-finding process from Part 1, allowing for the efficient creation of these composite images.
+    </p>
+
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/deck_mosaic.png" class="h-96">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Automatically stitched mosaic of my deck.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/inlier_matches.png" class="h-96">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Automatically detected inlier matches between the two images in my
+        living room.
+    </p>
+
+    <h2 class="text-3xl font-bold p-2">Table of Contents</h2>
+    <ol class="text-xl pl-9 list-disc p-2 text-blue-500">
+        <li>
+            <a class="underline" href="#1">
+                4A Step 1: Shoot the Pictures
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2">
+                4A Step 2: Recover Homographies
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#3">
+                4A Step 3: Warp the Images
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#4">
+                4A Step 4: Image Rectification
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#5">
+                4A Step 5: Blend the Images into a Mosaic
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#b1">
+                4B Step 1: Detecting Corner Features in an Image
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#b2">
+                4B Step 2: Selecting the Best Corners with Adaptive Non-Maximal Suppression
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#b3">
+                4B Step 3: Extracting Feature Descriptors
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#b4">
+                4B Step 4: Feature Matching
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#b5">
+                4B Step 5: RANSAC to Compute a Robust Homography Estimate
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#b6">
+                4B Step 6: Produce a Mosaic Automatically
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#w">
+                What I Learned
+            </a>
+        </li>
+    </ol>
+
+    <h2 id="1" class="text-3xl font-bold p-2">4A Step 1: Shoot the Pictures</h2>
+    <p class="text-xl p-2">
+        To be able to create a mosaic of two images, we first need to take two pictures of the same scene from
+        different angles but with the same center of projection. The two images should have a significant overlap
+        between them. I took two pictures of my living room from two different angles with my phone camera.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/correspondences.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        My two images of the living room with defined correspondences.
+    </p>
+
+    <h2 id="2" class="text-3xl font-bold p-2">4A Step 2: Recover Homographies</h2>
+    <p class="text-xl p-2">
+        The homography matrix \(\mathbf{H}\) describes a transformation between two planes. Given a set of corresponding
+        points
+        from two images, we aim to compute the homography matrix that maps points from one image to the other.
+
+        Let the correspondence between the two images be given by points \(\mathbf{p}_1 = (x_1, y_1)\) in the first
+        image
+        and
+        \(\mathbf{p}_2 = (x_2, y_2)\) in the second image. The homography relates these points via the equation:
+        \[
+        \begin{bmatrix}
+        x_2 \\
+        y_2 \\
+        1
+        \end{bmatrix}
+        \propto
+        \mathbf{H}
+        \begin{bmatrix}
+        x_1 \\
+        y_1 \\
+        1
+        \end{bmatrix}.
+        \]
+        The goal is to compute the \(3 \times 3\) homography matrix \(\mathbf{H}\)
+
+        For each pair of corresponding points \(\mathbf{p}_1 = (x_1, y_1)\) and \(\mathbf{p}_2 = (x_2, y_2)\) we derive
+        two
+        linear
+        equations from the homography relationship:
+        \[
+        \begin{aligned}
+        x_2 &= h_{11} x_1 + h_{12} y_1 + h_{13} - h_{31} x_1 x_2 - h_{32} y_1 x_2, \\
+        y_2 &= h_{21} x_1 + h_{22} y_1 + h_{23} - h_{31} x_1 y_2 - h_{32} y_1 y_2.
+        \end{aligned}
+        \]
+        Rearranging these into a system of equations for \(n\) pairs of points leads to the matrix form:
+        \[
+        \mathbf{A} \mathbf{h} = \mathbf{b},
+        \]
+        where \(\mathbf{A}\) is a \(2n \times 8\) matrix constructed from the points in the first image, and
+        \(\mathbf{b}\) is
+        a \(2n
+        \times 1\) vector constructed from the points in the second image.
+
+        For each correspondence, the rows of \(\mathbf{A}\) are given by:
+        \[
+        \mathbf{A} =
+        \begin{bmatrix}
+        x_1 & y_1 & 1 & 0 & 0 & 0 & -x_1 x_2 & -y_1 x_2 \\
+        0 & 0 & 0 & x_1 & y_1 & 1 & -x_1 y_2 & -y_1 y_2
+        \end{bmatrix},
+        \]
+        and the vector \(\mathbf{b}\) is:
+        \[
+        \mathbf{b} =
+        \begin{bmatrix}
+        x_2 \\
+        y_2
+        \end{bmatrix}.
+        \]
+
+        To compute the homography matrix, we solve the least-squares problem:
+        \[
+        \mathbf{h} = \text{argmin} \|\mathbf{A} \mathbf{h} - \mathbf{b}\|.
+        \]
+        This is solved using the function <b>np.linalg.lstsq</b>, which provides the best-fit solution to this system.
+        The
+        resulting vector \(\mathbf{h}\) contains the first 8 elements of the homography matrix. The final element
+        \(h_{33}\)
+        is set
+        to 1, and \(\mathbf{h}\) is reshaped into a \(3 \times 3\) matrix:
+        \[
+        \mathbf{H} =
+        \begin{bmatrix}
+        h_{11} & h_{12} & h_{13} \\
+        h_{21} & h_{22} & h_{23} \\
+        h_{31} & h_{32} & 1
+        \end{bmatrix}.
+        \]
+    </p>
+
+    <h2 id="3" class="text-3xl font-bold p-2">4A Step 3: Warp the Images</h2>
+    <p class="text-xl p-2">
+        To warp an image, we need to apply the homography matrix \(\mathbf{H}\) to each pixel in the image. To determine
+        the
+        size of the destination image, we first apply the homography to the four corners of the source image. The
+        destination image is then defined as the bounding box that contains all the transformed corner points. If the
+        warped corner points are negative, we shift the image to ensure all points are positive.
+    </p>
+    <p class="text-xl p-2">
+        To avoid holes in the destination image, we can adopt the inverse warping approach. For each pixel \((x, y)\) in
+        in the destination image, we compute the corresponding pixel \((x', y')\) in the source image by
+        applying the inverse homography matrix \(\mathbf{H}^{-1}\):
+        \[
+        \begin{bmatrix}
+        x' \\
+        y' \\
+        1
+        \end{bmatrix}
+        \propto
+        \mathbf{H}^{-1}
+        \begin{bmatrix}
+        x \\
+        y \\
+        1
+        \end{bmatrix}.
+        \]
+        The pixel \((x', y')\) is then interpolated from the source image to the destination image using bilinear
+        interpolation.
+    </p>
+
+    <h2 id="4" class="text-3xl font-bold p-2">4A Step 4: Image Rectification</h2>
+    <p class="text-xl p-2">
+        After implementing the warp function, we can rectify elements in the image. To rectify an element, we need to
+        compute the homography matrix that maps the element to a rectangle. We can then apply the warp
+        function to the element to rectify it.
+    </p>
+    <p class="text-xl p-2">
+        In the example below, I rectified the picture frame in my living room by letting the four corners of the frame
+        map to the four corners of a rectangle. The resulting rectified frame is shown below.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/rectification.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Rectified picture frame in my living room.
+    </p>
+
+    <h2 id="5" class="text-3xl font-bold p-2">4A Step 5: Blend the Images into a Mosaic</h2>
+    <p class="text-xl p-2">
+        To blend the images into a mosaic, we can project one image onto the other using the homography matrix.
+
+        In the example below, I warped the first image onto the second image, and created a mask with the
+        warped pixels in the first image being set to 1 and the rest to 0. From the result, we can see that the key
+        points
+        are well aligned, and the two images are ready to be blended.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/image1_warped_image2_expanded_mask.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Warped image 1, Expanded image 2, and Mask.
+    </p>
+    <p class="text-xl p-2">
+        To blend the images, we can directly blend the images using the mask we just created. The blending is done by
+        setting the pixel value to the first image if the mask is 1 and the second image if the mask is 0. The result is
+        shown below. We can see that the two images are well blended into a mosaic. However, the blending is not
+        perfect, and we can see a boundary between the two images.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/direct_blending.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Direct blending of the two images.
+    </p>
+    <p class="text-xl p-2">
+        To improve the blending, we can cross dissolve the images at the overlapping region. The cross-dissolve can be
+        done
+        with the following masks that linearly interpolate between the two images.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/alpha_masks.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Alpha masks for cross-dissolve.
+    </p>
+    <p class="text-xl p-2">
+        We can then blend the images using the masks above. As for those pixels that are not in the overlapping region,
+        we can directly blend the images using the mask we created earlier. The result is shown below. We can see that
+        the blending is much smoother, and the boundary between the two images is not visible.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/alpha_blending.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Cross-dissolve blending of the two images.
+    </p>
+
+    <h2 id="b1" class="text-3xl font-bold p-2">4B Step 1: Detecting Corner Features in an Image</h2>
+
+    <p class="text-xl p-2">
+        To detect corner features in an image, we can use the Harris corner detector. The Harris corner detector
+        computes the corner response function \(R\) for each pixel in the image. The response function is given by:
+        \[
+        R = \text{det}(\mathbf{M}) - k \cdot \text{trace}(\mathbf{M})^2,
+        \]
+        where \(\mathbf{M}\) is the structure tensor of the image, and \(k\) is a constant. The structure tensor is
+        defined as:
+        \[
+        \mathbf{M} =
+        \begin{bmatrix}
+        I_x^2 & I_x I_y \\
+        I_x I_y & I_y^2
+        \end{bmatrix},
+        \]
+        where \(I_x\) and \(I_y\) are the image gradients in the \(x\) and \(y\) directions, respectively.
+
+        The Harris corner detector computes the corner response function for each pixel in the image. The pixels with
+        high corner response values are considered corners. By calling the function <b>skimage.feature.corner_harris</b>
+        and <b>skimage.feature.peak_local_max</b>, we can detect the corner features in the image.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/harris_corners_left.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Detected corner features in the left image.
+    </p>
+
+    <h2 id="b2" class="text-3xl font-bold p-2">4B Step 2: Selecting the Best Corners with Adaptive Non-Maximal
+        Suppression</h2>
+    <p class="text-xl p-2">
+        The <b>Adaptive Non-Maximal Suppression algorithm</b> selects a subset of interest points from detected corners
+        in an
+        image
+        based on their strength, aiming to preserve the most significant features while reducing redundancy.
+        The algorithm begins by extracting and sorting corner strengths, then computes suppression radii for each corner
+        based
+        on the distance to stronger corners while considering their strength relative to a specified threshold. Finally,
+        it
+        selects the top features based on these radii, returning the coordinates of the most significant corners that
+        maximize
+        both strength and spatial distribution.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/anms_corners_left.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Selected corners in the left image using adaptive non-maximal suppression.
+    </p>
+
+    <h2 id="b3" class="text-3xl font-bold p-2">4B Step 3: Extracting Feature Descriptors</h2>
+    <p class="text-xl p-2">
+        Feature descriptors are created by initially extracting pixel values from a 40x40 window centered on the
+        detected
+        corners. These pixel values are then downsampled to an 8x8 patch and normalized to achieve zero mean and unit
+        variance.
+        Finally, the normalized values are reshaped into a 64-dimensional vector, representing the corner's feature
+        descriptor.
+    </p>
+
+    <h2 id="b4" class="text-3xl font-bold p-2">4B Step 4: Feature Matching</h2>
+    <p class="text-xl p-2">
+        Feature matching is performed by using the Lowe's ratio test.
+        For a descriptor in the first image, we find the two closest descriptors in the second image based on
+        Euclidean distance.
+        If the ratio of the nearest to the second-nearest distance is below a specified threshold, the pair
+        is considered a match. This process is repeated for all descriptors in the first image, resulting in a set of
+        matched
+        feature pairs.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/matches.png" class="h-96">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Matched features between the two images.
+    </p>
+
+    <h2 id="b5" class="text-3xl font-bold p-2">4B Step 5: RANSAC to Compute a Robust Homography Estimate</h2>
+    <p class="text-xl p-2">
+        The RANSAC algorithm is used to select a robust set of feature matches to compute a homography matrix.
+        The algorithm iteratively selects a random subset (in our case, 4 pairs) of feature matches to compute a
+        homography matrix. The homography matrix is then used to warp the matched points from the first image to the
+        second image. The number of inliers is computed by comparing the warped points to the actual points in the
+        second
+        image. The subset of feature matches with the most inliers is considered the best set of matches, and the
+        homography matrix is re-computed using all the inliers.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/inlier_matches.png" class="h-96">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Inlier matches between the two images.
+    </p>
+
+    <h2 id="b6" class="text-3xl font-bold p-2">4B Step 6: Produce a Mosaic Automatically</h2>
+    <p class="text-xl p-2">
+        With the homography matrix computed from RANSAC, we can now automatically stitch the two images together.
+        The first image is warped onto the second image using the homography matrix. The two images are then blended
+        together using the alpha blending technique described in Part 4A.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/room_mosaic.png" class="h-96">
+        <img src="output/room_mosaic_2.png" class="h-96">
+        <img src="output/deck_mosaic.png" class="h-96">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Automatically stitched mosaics of my living room and deck.
+    </p>
+
+    <h2 id="w" class="text-3xl font-bold p-2">What I Learned</h2>
+    <p class="text-xl p-2">
+        The most exciting thing I learned from this project was how to automatically stitch two images together. I
+        discovered
+        how to detect corner features in an image, extract feature descriptors, and match features between two images.
+        Additionally, I learned to compute a robust homography matrix using RANSAC.
+    </p>
+    <p class="text-xl p-2">
+        Among all
+        the
+        techniques I explored, I found feature extraction to be the most intriguing. It's fascinating to see how
+        efficiently we
+        can extract features from a point in an image by analyzing its surrounding pixels. These surrounding pixels can
+        be
+        easily organized into a vector through downsampling and normalization, and this straightforward method yields
+        surprisingly effective results!
+    </p>
+</body>
+
+</html>
