@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+        integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+    <!-- The loading of KaTeX is deferred to speed up page rendering -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+        integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg"
+        crossorigin="anonymous"></script>
+    <!-- To automatically render math in text elements, include the auto-render extension: -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"
+        onload="renderMathInElement(document.body);"></script>
+    <title>Final Project: Neural Radiance Field!</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+</head>
+
+<body class="container mx-auto p-2">
+    <h1 class="text-3xl font-bold text-center">Neural Radiance Field!</h1>
+    <p class="text-2xl text-center p-2">
+        Yueheng Zeng
+        <span class="font-bold text-rose-500">@</span>
+        Final Project
+    </p>
+    <h2 class="text-3xl font-bold p-2">Overview</h2>
+    <p class="text-xl p-2">
+        This project is a fun exploration of the neural field and neural radiance field. In the first part, we fit a
+        neural field to a 2D image. In the second part, we fit a neural radiance field to a 3D scene.
+    </p>
+
+    <div class="flex justify-center p-2 flex-wrap">
+        <video src="output/3d/rendered_images.mp4" class="h-72" autoplay muted loop></video>
+        <video src="output/3d/rendered_depths.mp4" class="h-72 pl-6" autoplay muted loop></video>
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Rendered Images and Depths of the 3D Scene with Neural Radiance Field
+    </p>
+
+    <h2 class="text-3xl font-bold p-2">Table of Contents</h2>
+    <ol class="text-xl pl-9 list-disc p-2 text-blue-500">
+        <li>
+            <a class="underline" href="#1">
+                Part 1: Fit a Neural Field to a 2D Image
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#11">
+                Part 1.1: Implement Sinusoidal Positional Encoding for 2D images
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#12">
+                Part 1.2: Implement a Neural Field Model for 2D images
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#a13">
+                Part 1.3: Training the Neural Field Model
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#14">
+                Part 1.4: Hyperparameter Tuning
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2">
+                Part 2: Fit a Neural Radiance Field from Multi-view Images
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#21">
+                Part 2.1: Create Rays from Cameras
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#2223">
+                Part 2.2 & 2.3: Sampling and Data Loading
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#24">
+                Part 2.4: Neural Radiance Field
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#25">
+                Part 2.5: Volume Rendering
+            </a>
+        </li>
+        <li>
+            <a class="underline" href="#bw">
+                Bells & Whistles: Render the Depths Map Video
+            </a>
+        </li>
+    </ol>
+
+    <h2 id="1" class="text-3xl font-bold p-2">Part 1: Fit a Neural Field to a 2D Image</h2>
+    <p class="text-xl p-2">
+        In this part, we implement and train a neural field to represent a 2D image. More mathematically, we are trying
+        to fit a neural field that:
+        \[
+        F: \{x, y\} \rightarrow \{r, g, b\}
+        \]
+        where \(x, y\) are the coordinates of the image and \(r, g, b\) are the RGB values of the image.
+    </p>
+
+    <h3 id="11" class="text-2xl font-bold p-2">Part 1.1: Implement Sinusoidal Positional Encoding for 2D images</h3>
+    <p class="text-xl p-2">
+        We implement the sinusoidal positional encoding for 2D images. The positional encoding is defined as:
+        \[
+        PE(x) = \{x, sin(2^0\pi x), cos(2^0\pi x),
+        sin(2^1\pi x), cos(2^1\pi x), ..., sin(2^{L-1}\pi x), cos(2^{L-1}\pi x)\}
+        \]
+        where \(L\) is highest frequency and \(x\) is the input coordinate.
+        For example, if \(L = 10\), the positional encoding for a \(2\) dimensional input is of size \(2 \times 2 \times
+        L + 2 = 42\).
+    </p>
+
+    <h3 id="12" class="text-2xl font-bold p-2">Part 1.2: Implement a Neural Field Model for 2D images</h3>
+    <p class="text-xl p-2">
+        We implement a neural field model for 2D images. The neural field model is defined as:
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="assets/neural_field_arch.jpg" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Neural Field Model Architecture
+    </p>
+    <p class="text-xl p-2">
+        More specifically, the parameter \(L\) is set to \(10\) and the other parameters are set to the same values as
+        in the plot shown above.
+    </p>
+
+    <h3 id="a13" class="text-2xl font-bold p-2">Part 1.3: Training the Neural Field Model</h3>
+    <p class="text-xl p-2">
+        We train the neural field model using the Adam optimizer with a learning rate of \(0.01\). The loss function is
+        the mean squared error. The model is trained for \(1000\) iterations with a batch size of \(10000\).
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="assets/2d_1.jpg" class="h-72">
+        <img src="assets/2d_2.jpg" class="h-72 pl-6">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        The Original Images Used for Training
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="assets/2d_1_psnr.png" class="h-72">
+        <img src="assets/2d_2_psnr.png" class="h-72 pl-6">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        The PSNR of the Original Images
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/2d_1/reconstructed_L=10_layers=4_hidden=256_iter=0_psnr=7.88.png" class="h-48">
+        <img src="output/2d_1/reconstructed_L=10_layers=4_hidden=256_iter=200_psnr=22.40.png" class="h-48 pl-2">
+        <img src="output/2d_1/reconstructed_L=10_layers=4_hidden=256_iter=400_psnr=22.88.png" class="h-48 pl-2">
+        <img src="output/2d_1/reconstructed_L=10_layers=4_hidden=256_iter=600_psnr=23.05.png" class="h-48 pl-2">
+        <img src="output/2d_1/reconstructed_L=10_layers=4_hidden=256_iter=800_psnr=23.07.png" class="h-48 pl-2">
+        <img src="output/2d_1/reconstructed_L=10_layers=4_hidden=256_iter=999_psnr=23.12.png" class="h-48 pl-2">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        The Reconstructed Images of the First Image During Training
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/2d_2/reconstructed_L=10_layers=4_hidden=256_iter=0_psnr=7.91.png" class="h-48">
+        <img src="output/2d_2/reconstructed_L=10_layers=4_hidden=256_iter=200_psnr=17.79.png" class="h-48 pl-2">
+        <img src="output/2d_2/reconstructed_L=10_layers=4_hidden=256_iter=400_psnr=18.55.png" class="h-48 pl-2">
+        <img src="output/2d_2/reconstructed_L=10_layers=4_hidden=256_iter=600_psnr=18.95.png" class="h-48 pl-2">
+        <img src="output/2d_2/reconstructed_L=10_layers=4_hidden=256_iter=800_psnr=19.23.png" class="h-48 pl-2">
+        <img src="output/2d_2/reconstructed_L=10_layers=4_hidden=256_iter=999_psnr=19.43.png" class="h-48 pl-2">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        The Reconstructed Images of the Second Image During Training
+    </p>
+
+    <h3 id="14" class="text-2xl font-bold p-2">Part 1.4: Hyperparameter Tuning</h3>
+    <p class="text-xl p-2">
+        We perform hyperparameter tuning on the neural field model. The hyperparameters we tune are the the highest
+        frequency \(L\) and the number of layers in the neural field model. We turn the highest frequency \(L\) in \([6,
+        8, 10, 12, 14]\) and the number of layers in \([2, 4, 6, 8, 10]\). The best hyperparameters are still \(L = 10\)
+        and the number of layers is \(4\) and other configurations of hyperparameters either do not differ much from the
+        best hyperparameters or perform worse.
+    </p>
+    <p class="text-xl p-2">
+        <strong>For the first image:</strong>
+        <br>
+        L=6: PSNR = 22.52
+        <br>
+        L=8: PSNR = 23.06
+        <br>
+        L=10: PSNR = 23.10 # Default
+        <br>
+        L=12: PSNR = 16.85
+        <br>
+        L=14: PSNR = 10.46
+        <br>
+        <br>
+        num_layers=2: PSNR = 22.53
+        <br>
+        num_layers=4: PSNR = 23.05 # Default
+        <br>
+        num_layers=6: PSNR = 21.63
+        <br>
+        num_layers=8: PSNR = 22.54
+        <br>
+        num_layers=10: PSNR = 21.68
+    </p>
+    <p class="text-xl p-2">
+        <strong>For the second image:</strong>
+        <br>
+        L=6: PSNR = 18.96
+        <br>
+        L=8: PSNR = 19.61
+        <br>
+        L=10: PSNR = 19.08 # Default
+        <br>
+        L=12: PSNR = 17.36
+        <br>
+        L=14: PSNR = 17.20
+        <br>
+        <br>
+        num_layers=2: PSNR = 18.36
+        <br>
+        num_layers=4: PSNR = 19.23 # Default
+        <br>
+        num_layers=6: PSNR = 17.43
+        <br>
+        num_layers=8: PSNR = 18.46
+        <br>
+        num_layers=10: PSNR = 18.90
+    </p>
+
+    <h2 id="2" class="text-3xl font-bold p-2">Part 2: Fit a Neural Radiance Field from Multi-view Images</h2>
+    <p class="text-xl p-2">
+        In this part, we implement and train a neural radiance field to represent a 3D scene. More mathematically, we
+        are
+        trying to fit a neural radiance field that:
+        \[
+        F: \{x, r\} \rightarrow \{r, g, b, \sigma\}
+        \]
+        where \(x\) is the 3D coordinate of the scene, \(r\) is the ray direction, and \(r, g, b\) are the RGB values
+        and \(\sigma\) is the density.
+    </p>
+
+    <h3 id="21" class="text-2xl font-bold p-2">Part 2.1: Create Rays from Cameras</h3>
+    <p class="text-xl p-2">
+        We first need to transform a point from camera to the world space. This is implemented in the function
+        <b>transform</b>. This function transforms points from camera coordinates to world coordinates by applying a
+        camera-to-world
+        transformation matrix.
+    </p>
+    <p class="text-xl p-2">
+        We then implement another function <b>pixel_to_camera</b> that transform a point from the pixel coordinate
+        system
+        back to the camera
+        coordinate system using the camera intrinsic matrix.
+    </p>
+    <p class="text-xl p-2">
+        We then implement the function <b>pixel_to_ray</b> that computes ray origins and directions from pixel
+        coordinates by
+        first mapping the pixel coordinates to camera coordinates
+        using the camera's intrinsic matrix. These camera coordinates are then transformed to world coordinates using
+        the
+        camera-to-world transformation matrix. The ray origins are set as the camera's position in the world space,
+        while the
+        ray directions are computed as vectors pointing from the camera position to the transformed points in the world
+        space.
+    </p>
+
+    <h3 id="2223" class="text-2xl font-bold p-2">Part 2.2 & 2.3: Sampling and Data Loading</h3>
+    <p class="text-xl p-2">
+        We first need to implement the data loading class <b>RaysData</b> that samples rays from images. It prepares a
+        grid
+        of UV coordinates, offset by 0.5 to
+        account for the pixel
+        center, and computes ray origins and directions using the camera intrinsics and extrinsics.
+    </p>
+    <p class="text-xl p-2">
+        We then implement the function <b>sample_along_rays</b> that discretizes each ray into a fixed number of points
+        between near and far bounds. To improve coverage and prevent
+        overfitting, we need to introduce random perturbations to the sampling locations during training. This
+        combination of uniformly
+        spaced and perturbed sampling ensures diverse and robust coverage of the 3D scene for the subsequent NeRF
+        training.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/3d/rays.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Sampled Rays from the 3D Scene
+    </p>
+
+    <h3 id="24" class="text-2xl font-bold p-2">Part 2.4: Neural Radiance Field</h3>
+    <p class="text-xl p-2">
+        We implement the neural radiance field model. The neural radiance field model is defined as:
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="assets/neural_radiance_field_arch.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Neural Radiance Field Model Architecture
+    </p>
+    <p class="text-xl p-2">
+        More specifically, the highest frequency for positional encoding of the 3D coordinates is set to \(10\) and the
+        highest frequency for positional encoding of the ray directions is set to \(4\). The other parameters are set to
+        the same values as in the plot shown above.
+    </p>
+
+    <h3 id="25" class="text-2xl font-bold p-2">Part 2.5: Volume Rendering</h3>
+    <p class="text-xl p-2">
+        To render the 3D scene, we implemented function <b>volrend</b> that computes the discrete
+        approximation of the volume rendering equation, which is defined as:
+        \[
+        \hat{C}(\mathbf{r})=\sum_{i=1}^N T_i\left(1-\exp \left(-\sigma_i \delta_i\right)\right) \mathbf{c}_i, \text {
+        where }
+        T_i=\exp
+        \left(-\sum_{j=1}^{i-1} \sigma_j \delta_j\right)
+        \]
+        where \(c_i\) is the color of the \(i\)th sample and \(T_i\) is the probability of a ray not terminating before
+        sample location \(i\).
+    </p>
+    <p class="text-xl p-2">
+        With this function, we can then train the neural radiance field model using the Adam optimizer with a learning
+        rate of \(0.0005\). The loss function is the mean squared error of the real pixel values and the rendered pixel
+        values. The model is trained for \(1500\) iterations with a batch size of \(10000\).
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/3d/val_image_0_iter_100.png" class="h-72">
+        <img src="output/3d/val_image_0_iter_200.png" class="h-72 pl-6">
+        <img src="output/3d/val_image_0_iter_300.png" class="h-72 pl-6">
+        <img src="output/3d/val_image_0_iter_400.png" class="h-72 pl-6">
+        <img src="output/3d/val_image_0_iter_500.png" class="h-72 pl-6">
+        <img src="output/3d/val_image_0_iter_600.png" class="h-72 pl-6">
+        <img src="output/3d/val_image_0_iter_700.png" class="h-72 pl-6">
+        <img src="output/3d/val_image_0_iter_800.png" class="h-72 pl-6">
+        <img src="output/3d/val_image_0_iter_1500.png" class="h-72 pl-6">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        The Rendered Images of First View in the Validation Dataset during Training
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <img src="output/3d/val_psnrs.png" class="h-72">
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        The PSNR of the Validation Views during Training (All \(> 23\) after 1500 iterations)
+    </p>
+    <p class="text-xl p-2">
+        With the trained neural radiance field model, we can render the 3D scene on the test dataset.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <video src="output/3d/rendered_images.mp4" class="h-72" autoplay muted loop></video>
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        A Spherical Rendering using the Provided Cameras Extrinsics in the Test Dataset
+    </p>
+
+    <h2 id="bw" class="text-3xl font-bold p-2">Bells & Whistles: Render the Depths Map Video</h2>
+    <p class="text-xl p-2">
+        We can modify the volume rendering process to compute a depth map by replacing the rgb values with the depth of
+        points along the ray in the volume rendering equation.
+    </p>
+    <div class="flex justify-center p-2 flex-wrap">
+        <video src="output/3d/rendered_depths.mp4" class="h-72" autoplay muted loop></video>
+    </div>
+    <p class="text-center text-xl p-2 text-gray-500">
+        Rendered Depths of the 3D Scene with Neural Radiance Field
+    </p>
+
+</body>
+
+</html>
